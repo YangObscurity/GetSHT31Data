@@ -1,0 +1,6 @@
+menu "HTTP Setting"
+    config HTTP_SERVER_URL
+        string "SERVER_URL"
+        help
+            MUST INPUT YOUR SERVER_URL
+endmenu

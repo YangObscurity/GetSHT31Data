@@ -1,0 +1,10 @@
+menu "NETWORK_CFG"
+    config NETWORK_SSID
+        string "SSID"
+        help
+            ENTER YOUR HOST WIFI SSID TO CONNECT
+    config NETWORK_PASSWORD
+        string "PASSWORD"
+        help 
+            ENTER YOUR HOST WIFI PASSWORD TO CONNECT
+endmenu

@@ -1,0 +1,2 @@
+dependencies:
+  esp-idf-lib/sht3x: "^1.0.8"

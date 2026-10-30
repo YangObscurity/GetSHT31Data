@@ -1,0 +1,12 @@
+menu "ESP_MAIN_SETTING"
+    config ESP_DEBUG_LOGV
+        bool "SHOW THE INFORMATION OF DEBUG"
+        default y
+        help
+            OPEN THIS WILL SHOW DEBUG INFORMATION(verbose mode)
+    config ESP_DEVICE_ID
+        string "DEVICE ID"
+        default "ESP32_1"
+        help
+            ALLOCATE THE DEVICE ID OF ESP32
+endmenu

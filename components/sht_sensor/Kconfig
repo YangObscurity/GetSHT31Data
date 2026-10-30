@@ -1,0 +1,7 @@
+menu "SHT Sensor Configuration"
+    config ALGORISM_VERSION
+        string "Algorism Version"
+        default "B1"
+        help
+            ALGORISM VERSION OF THIS PROJECT
+endmenu
