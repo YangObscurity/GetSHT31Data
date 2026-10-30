@@ -82,5 +82,6 @@ Desktop.ini
 
 # Custom Ignore
 dht_sensor/
+experiments/
 .vscode/
 .devcontainer

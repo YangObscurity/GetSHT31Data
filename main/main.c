@@ -7,6 +7,7 @@
 
 void app_main(void)
 {
+    esp_log_level_set("*", ESP_LOG_WARN);
     esp_err_t res = nvs_flash_init();
     if (res != ESP_OK){
         ESP_ERROR_CHECK(nvs_flash_erase());

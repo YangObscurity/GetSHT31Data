@@ -6,6 +6,8 @@
 #include "sht_sensor.h"
 #include "sdkconfig.h"
 #include "esp_err.h"
+#include "nvs.h"
+#include "network.h"
 
 
 #define SHT_WAKETIME 1000
@@ -13,12 +15,53 @@
 #define SHT_I2C_ADDRESS 0x44
 #define SHT_I2C_PORT I2C_NUM_0
 
+#define SEQ_NVS_NAMESPACE "sapi"
+#define SEQ_NVS_KEY       "seq"
+#define SEQ_BLOCK         64
+
 static const char * TAG = "SHT31";
 static bool initate_sensor = false;
 static uint32_t sequence_number = 0;
 static sht3x_t sht3x_config;
+static nvs_handle_t seq_nvs = 0;
+static uint32_t seq_persist_at = 0;
 
 //Private Functions
+static void seq_load(void)
+{
+    sequence_number = 0;
+    seq_persist_at = 0;
+    esp_err_t err = nvs_open(SEQ_NVS_NAMESPACE, NVS_READWRITE, &seq_nvs);
+    if (err != ESP_OK) {
+        seq_nvs = 0;
+        ESP_LOGW(TAG, "NVS open failed (%s), seq starts from 0 (NOT persistent)",
+                 esp_err_to_name(err));
+        return;
+    }
+    uint32_t stored = 0;
+    if (nvs_get_u32(seq_nvs, SEQ_NVS_KEY, &stored) == ESP_OK) {
+        sequence_number = stored;
+    } else {
+        sequence_number = 0;
+    }
+    seq_persist_at = sequence_number + SEQ_BLOCK;
+    if (nvs_set_u32(seq_nvs, SEQ_NVS_KEY, seq_persist_at) == ESP_OK) {
+        nvs_commit(seq_nvs);
+    }
+    ESP_LOGI(TAG, "SEQ restored=%" PRIu32 ", reserved until %" PRIu32,
+             sequence_number, seq_persist_at);
+}
+
+static void seq_maybe_persist(void)
+{
+    if (seq_nvs == 0 || sequence_number < seq_persist_at) return;
+    seq_persist_at = sequence_number + SEQ_BLOCK;
+    if (nvs_set_u32(seq_nvs, SEQ_NVS_KEY, seq_persist_at) == ESP_OK) {
+        nvs_commit(seq_nvs);
+    }
+    ESP_LOGI(TAG, "SEQ reserved until %" PRIu32, seq_persist_at);
+}
+
 static uint64_t get_timestamp_ms(void)
 {
     struct timeval tv;
@@ -102,10 +145,25 @@ void read_sht_data(void* arg)
 {
     QueueHandle_t sht_queue_handler = (QueueHandle_t)arg;
     sht_data_t sht_data;
-    TickType_t last_wake_time = xTaskGetTickCount();
+    TickType_t last_wake_time;
     float temperature = 0.0f;
     float humidity = 0.0f;
-    
+
+    seq_load();
+
+    ESP_LOGI(TAG, "WAITING FOR SNTP TIME SYNC");
+    uint32_t waited_ms = 0;
+    while (!network_time_synced()) {
+        vTaskDelay(pdMS_TO_TICKS(200));
+        waited_ms += 200;
+        if (waited_ms % 30000 == 0) {
+            ESP_LOGW(TAG, "STILL WAITING FOR TIME (%" PRIu32 " s) - sampling suppressed",
+                     waited_ms / 1000);
+        }
+    }
+    ESP_LOGI(TAG, "TIME VALID -> START 1Hz SAMPLING, seq=%" PRIu32, sequence_number);
+    last_wake_time = xTaskGetTickCount();
+
     for(;;) {
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(SHT_WAKETIME));
         if (!initate_sensor) {
@@ -122,5 +180,6 @@ void read_sht_data(void* arg)
         } else {
             data_failed(&sht_data, sht_queue_handler);
         }
+        seq_maybe_persist();
     }
 }

@@ -15,6 +15,7 @@ static EventGroupHandle_t wifi_event_handler = NULL;
 static const char * TAG = "WIFI"; 
 static int8_t current_retry = 0;
 static TaskHandle_t life_guard_task_handler = NULL;
+static volatile bool time_synced = false;
 void life_guard(void* arg)
 {
     for(;;)
@@ -68,12 +69,13 @@ static void event_handler (void* event_handler_arg,
             ESP_LOGI(TAG,"[SUSPEND]WIFI GUARD");
         }
         ESP_LOGI(TAG,"CONNECT SUCCESS, CURRENT IP:" IPSTR,IP2STR(&(ip_event->ip_info.ip)));
-        esp_sntp_config_t sntp_cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG("ntp.aliyun.com");
+        esp_sntp_config_t sntp_cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG(NTP_SERVER_IP);
         esp_netif_sntp_init(&sntp_cfg);
-        if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(10000)) == ESP_OK) {
-            ESP_LOGI(TAG, "SNTP Sync SUCCESS!");
+        if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(15000)) == ESP_OK) {
+            time_synced = true;
+            ESP_LOGI(TAG, "SNTP SYNC SUCCESS");
         } else {
-            ESP_LOGW(TAG, "SNTP Sync Timeout!");
+            ESP_LOGE(TAG, "SNTP SYNC TIMEOUT, SAMPLING STAYS OFF");
         }
         setenv("TZ", "UTC0", 1);
         tzset();
@@ -131,4 +133,8 @@ void network_init(void)
 EventGroupHandle_t GetEventGroupHandler(void)
 {
     return wifi_event_handler;
+}
+bool network_time_synced(void)
+{
+    return time_synced;
 }
